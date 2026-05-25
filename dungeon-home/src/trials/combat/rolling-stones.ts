@@ -1,0 +1,208 @@
+import type { Trial } from '../../types';
+import { COLORS } from '../../constants';
+import { player } from '../../state';
+import { spawnBurst } from '../../particles';
+import { beep, SFX } from '../../audio';
+import { move, drawArena } from '../shared';
+
+type Channel = {
+    cy: number;
+    dir: 1 | -1;
+    speed: number;
+    spawnInterval: number;
+    spawnTimer: number;
+};
+type Stone = { x: number; ch: number; rot: number; alive: boolean };
+
+export function makeRollingStones(b: any, p: any, tier: number): Trial {
+    // ── Layout ─────────────────────────────────────────────────
+    const SAFE_TOP    = 56;
+    const SAFE_BOT    = 56;
+    const numChannels = 5;
+    const channelH    = (b.h - SAFE_TOP - SAFE_BOT) / numChannels;
+    const STONE_SIZE  = 60;                                     // smaller than channel — feels readable
+    const STONE_R     = STONE_SIZE / 2;
+    const PLAYER_R    = 11;
+    const HIT_PAD     = 3;                                      // forgiving grace pixel-pad
+
+    // ── Per-channel personalities (all SLOW now) ───────────────
+    const speedProfile = [1.2, 1.6, 1.3, 1.8, 1.1];             // base speeds — gentle
+    const dirProfile: (1 | -1)[] = [1, -1, 1, -1, 1];
+
+    const wayfarerEase = player.clazz.id === 'wayfarer' ? 0.80 : 1;
+    const channels: Channel[] = [];
+    for (let i = 0; i < numChannels; i++) {
+        const baseSpeed = (speedProfile[i] + tier * 0.30) * wayfarerEase;  // gentler tier scaling
+        const targetGap = 420 - tier * 50;                                  // T1 370 · T2 320 · T3 270
+        channels.push({
+            cy: b.y + SAFE_TOP + (i + 0.5) * channelH,
+            dir: dirProfile[i],
+            speed: baseSpeed,
+            spawnInterval: Math.max(60, Math.floor(targetGap / baseSpeed)),
+            spawnTimer: 90 + Math.floor(Math.random() * 180),       // initial desync — no opening salvo
+        });
+    }
+
+    const stones: Stone[] = [];
+
+    p.x = b.x + b.w / 2;
+    p.y = b.y + b.h - SAFE_BOT / 2;
+    const goal = { x: b.x + b.w / 2, y: b.y + SAFE_TOP / 2, r: 26 };
+
+    let hitFlash = 0;
+    let won = false;
+
+    function spawn(chIdx: number) {
+        const ch = channels[chIdx];
+        stones.push({
+            x: ch.dir > 0 ? b.x - STONE_R - 4 : b.x + b.w + STONE_R + 4,
+            ch: chIdx,
+            rot: Math.random() * Math.PI * 2,
+            alive: true,
+        });
+    }
+
+    return {
+        type: 'combat', variant: 'rolling-stones', player: p, bounds: b,
+        title: `⚔  ROLLING STONES · TIER ${tier}`,
+        hint: 'Time your channel-switches — cross all 5 lanes to reach the top',
+
+        update() {
+            if (!won) move(p, b);
+            if (hitFlash > 0) hitFlash--;
+
+            // Spawn ticks
+            for (let i = 0; i < numChannels; i++) {
+                const ch = channels[i];
+                ch.spawnTimer--;
+                if (ch.spawnTimer <= 0) {
+                    spawn(i);
+                    ch.spawnTimer = ch.spawnInterval + Math.floor((Math.random() - 0.3) * 60);
+                }
+            }
+
+            // Move stones + collision
+            for (const s of stones) {
+                if (!s.alive) continue;
+                const ch = channels[s.ch];
+                s.x   += ch.speed * ch.dir;
+                s.rot += (ch.speed * ch.dir) * 0.035;
+                if ((ch.dir > 0 && s.x > b.x + b.w + STONE_R + 4) ||
+                    (ch.dir < 0 && s.x < b.x - STONE_R - 4)) {
+                    s.alive = false;
+                    continue;
+                }
+                if (!won) {
+                    const dx = s.x - p.x;
+                    const dy = ch.cy - p.y;
+                    if (Math.hypot(dx, dy) < STONE_R + PLAYER_R - HIT_PAD) {
+                        p.x = b.x + b.w / 2;
+                        p.y = b.y + b.h - SAFE_BOT / 2;
+                        hitFlash = 24; SFX.fail();
+                        break;
+                    }
+                }
+            }
+            for (let i = stones.length - 1; i >= 0; i--) if (!stones[i].alive) stones.splice(i, 1);
+
+            if (!won && Math.hypot(p.x - goal.x, p.y - goal.y) < goal.r) {
+                won = true;
+                beep(800, 0.25, 'sine');
+                spawnBurst(goal.x, goal.y, '#6f8a52', 35);
+            }
+        },
+
+        draw(ctx) {
+            drawArena(ctx, b, '#a14040');
+
+            // Safe-zone bands (top + bottom)
+            ctx.fillStyle = 'rgba(110,140,80,0.10)';
+            ctx.fillRect(b.x, b.y, b.w, SAFE_TOP);
+            ctx.fillRect(b.x, b.y + b.h - SAFE_BOT, b.w, SAFE_BOT);
+
+            // Channel road background
+            ctx.fillStyle = 'rgba(20,12,8,0.20)';
+            ctx.fillRect(b.x, b.y + SAFE_TOP, b.w, b.h - SAFE_TOP - SAFE_BOT);
+
+            // Dividers
+            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i <= numChannels; i++) {
+                const y = b.y + SAFE_TOP + i * channelH;
+                ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y); ctx.stroke();
+            }
+            // Dashed centerline per channel (road feel)
+            ctx.strokeStyle = 'rgba(255, 245, 186, 0.10)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([12, 14]);
+            for (const ch of channels) {
+                ctx.beginPath(); ctx.moveTo(b.x + 8, ch.cy); ctx.lineTo(b.x + b.w - 8, ch.cy); ctx.stroke();
+            }
+            ctx.setLineDash([]);
+
+            // Direction arrows
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            for (const ch of channels) {
+                ctx.fillStyle = 'rgba(0,0,0,0.22)';
+                const g = ch.dir > 0 ? '▶' : '◀';
+                for (let x = b.x + 70; x < b.x + b.w - 40; x += 160) ctx.fillText(g, x, ch.cy);
+            }
+            ctx.textBaseline = 'alphabetic';
+
+            // Pads
+            ctx.strokeStyle = 'rgba(200,155,90,0.45)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(b.x + b.w / 2 - 24, b.y + b.h - SAFE_BOT / 2 - 14, 48, 28);
+
+            ctx.fillStyle   = won ? '#6f8a52' : '#1a3520';
+            ctx.strokeStyle = '#6f8a52'; ctx.lineWidth = 2;
+            ctx.shadowColor = '#6f8a52'; ctx.shadowBlur = 12;
+            ctx.beginPath(); ctx.arc(goal.x, goal.y, goal.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Stones
+            for (const s of stones) {
+                if (!s.alive) continue;
+                const ch = channels[s.ch];
+                // shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.beginPath();
+                ctx.ellipse(s.x, ch.cy + STONE_R - 4, STONE_R * 0.85, STONE_R * 0.28, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // body
+                ctx.fillStyle = '#4a382a';
+                ctx.beginPath(); ctx.arc(s.x, ch.cy, STONE_R, 0, Math.PI * 2); ctx.fill();
+                // highlight
+                ctx.fillStyle = '#6a4e34';
+                ctx.beginPath();
+                ctx.arc(s.x - STONE_R * 0.28, ch.cy - STONE_R * 0.28, STONE_R * 0.62, 0, Math.PI * 2);
+                ctx.fill();
+                // outline
+                ctx.strokeStyle = '#2a1a10'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(s.x, ch.cy, STONE_R, 0, Math.PI * 2); ctx.stroke();
+                // rolling cracks
+                ctx.strokeStyle = '#1a1010'; ctx.lineWidth = 2;
+                for (const off of [0, Math.PI / 2]) {
+                    const a = s.rot + off;
+                    ctx.beginPath();
+                    ctx.moveTo(s.x + Math.cos(a) * STONE_R * 0.7, ch.cy + Math.sin(a) * STONE_R * 0.7);
+                    ctx.lineTo(s.x - Math.cos(a) * STONE_R * 0.7, ch.cy - Math.sin(a) * STONE_R * 0.7);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 14px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('REACH THE TOP', b.x + b.w / 2, b.y + 30);
+
+            if (hitFlash > 0) {
+                ctx.fillStyle = `rgba(161,64,64,${hitFlash / 40})`;
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+            }
+        },
+
+        isComplete() { return won; },
+    };
+}

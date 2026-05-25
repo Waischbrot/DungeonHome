@@ -5,7 +5,7 @@ import { I_X, I_Y, I_W, I_H } from './shared';
 import { makeShadowHunt }  from './combat/shadow-hunt';
 import { makeBossDuel }    from './combat/boss-duel';
 import { makeWaveDefense } from './combat/wave-defense';
-import { makeArrowVolley } from './combat/arrow-volley';
+import { makeRollingStones } from './combat/rolling-stones';
 
 // ── Puzzle ──
 import { makeMemorySeal }   from './puzzle/memory-seal';
@@ -30,7 +30,7 @@ const MAKERS: Record<TrialVariant, (b: any, p: any, tier: number) => Trial> = {
     'shadow-hunt':    makeShadowHunt,
     'boss-duel':      makeBossDuel,
     'wave-defense':   makeWaveDefense,
-    'arrow-volley':   makeArrowVolley,
+    'rolling-stones': makeRollingStones,
     'memory-seal':    makeMemorySeal,
     'pattern-match':  makePatternMatch,
     'rune-cipher':    makeRuneCipher,

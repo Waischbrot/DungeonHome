@@ -6,7 +6,7 @@ export type ClassId       = 'delver' | 'scholar' | 'artisan' | 'wayfarer';
 
 export type TrialVariant =
     // combat
-    | 'shadow-hunt' | 'boss-duel' | 'wave-defense' | 'arrow-volley'
+    | 'shadow-hunt' | 'boss-duel' | 'wave-defense' | 'rolling-stones'
     // puzzle
     | 'memory-seal' | 'pattern-match' | 'rune-cipher' | 'lights-out' | 'mirror-beam'
     // parkour

@@ -88,9 +88,9 @@ export const DOOR_TIER_REQ    = (tier: number) => tier;
 
 // ─── Trial variants per challenge type ──────────────────────────
 export const VARIANTS_BY_TYPE: Record<ChallengeType, TrialVariant[]> = {
-    combat:  ['shadow-hunt',  'boss-duel',     'wave-defense',  'arrow-volley'],
+    combat:  ['shadow-hunt',  'boss-duel',     'wave-defense',  'rolling-stones'],
     puzzle:  ['memory-seal',  'pattern-match', 'rune-cipher',   'lights-out', 'mirror-beam'],
-    parkour: ['moving-walls', 'spike-floor',   'pendulum-path', 'falling-floor'],
+    parkour: ['moving-walls', 'spike-floor',   'pendulum-path', 'falling-floor', 'maze'],
     economy: ['coin-rush',    'greed-gauntlet','coin-press'],
 };
 

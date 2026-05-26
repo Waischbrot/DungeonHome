@@ -15,7 +15,8 @@ export type TrialVariant =
     | 'coin-rush' | 'greed-gauntlet' | 'coin-press';
 
 export type Screen =
-    | 'title' | 'class-select' | 'hub' | 'trial' | 'pause' | 'journal' | 'dialog';
+    | 'title' | 'class-select' | 'hub' | 'trial' | 'pause' | 'journal' | 'dialog'
+    | 'trial-picker';
 
 export type RoomShape = 'chamber' | 'hall' | 'junction' | 'grand';
 export type NpcRole   = 'architect' | 'loremaster' | 'smith';
@@ -50,7 +51,6 @@ export interface Decoration {
 export interface Npc {
     id: string;
     role: NpcRole;
-    name: string;
     title: string;
     x: number; y: number;
     color: string;

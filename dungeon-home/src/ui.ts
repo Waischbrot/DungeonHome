@@ -302,7 +302,7 @@ export function drawNpcPrompt(ctx: CanvasRenderingContext2D, npc: Npc) {
     drawPanel(ctx, x, y, w, h, npc.color);
     ctx.fillStyle = npc.color; ctx.font = 'bold 16px Cinzel, serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(npc.name, x + 18, y + 14);
+    ctx.fillText(npc.title, x + 18, y + 14);
     ctx.fillStyle = COLORS.textDim; ctx.font = 'italic 11px Cinzel, serif';
     ctx.fillText(npc.title, x + 18, y + 36);
     ctx.textAlign = 'right';
@@ -381,7 +381,7 @@ export function drawDialog(ctx: CanvasRenderingContext2D, npc: Npc, lineIdx: num
     // name + title
     ctx.fillStyle = npc.color; ctx.font = 'bold 22px Cinzel, serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(npc.name, x + 134, y + 24);
+    ctx.fillText(npc.title, x + 134, y + 24);
     ctx.fillStyle = COLORS.textDim; ctx.font = 'italic 13px Cinzel, serif';
     ctx.fillText(npc.title, x + 134, y + 54);
 

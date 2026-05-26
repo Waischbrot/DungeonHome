@@ -335,3 +335,132 @@ export function drawJournal(ctx: CanvasRenderingContext2D) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.fillText('scroll: wheel  ·  ↑↓  ·  J or ESC to close', CANVAS_W / 2, CANVAS_H - 24);
 }
+
+// ───── TRIAL PICKER ─────
+import { VARIANTS_BY_TYPE } from './constants';
+import type { ChallengeType, TrialVariant } from './types';
+
+let pickerCategory: ChallengeType = 'combat';
+let pickerVariantIdx = 0;
+let pickerTier = 1;
+
+export type TrialPickerResult =
+    | 'continue'
+    | 'hub'
+    | { launch: { type: ChallengeType; variant: TrialVariant; tier: number } };
+
+export function updateTrialPicker(): TrialPickerResult {
+    if (keysPressed.has('escape') || keysPressed.has('t')) { SFX.back(); return 'hub'; }
+
+    // Category tabs
+    if (keysPressed.has('1')) { pickerCategory = 'combat';  pickerVariantIdx = 0; SFX.click(); }
+    if (keysPressed.has('2')) { pickerCategory = 'puzzle';  pickerVariantIdx = 0; SFX.click(); }
+    if (keysPressed.has('3')) { pickerCategory = 'parkour'; pickerVariantIdx = 0; SFX.click(); }
+    if (keysPressed.has('4')) { pickerCategory = 'economy'; pickerVariantIdx = 0; SFX.click(); }
+
+    // Variant list navigation
+    const variants = VARIANTS_BY_TYPE[pickerCategory];
+    if (keysPressed.has('arrowup')   || keysPressed.has('w')) {
+        pickerVariantIdx = (pickerVariantIdx + variants.length - 1) % variants.length;
+        SFX.click();
+    }
+    if (keysPressed.has('arrowdown') || keysPressed.has('s')) {
+        pickerVariantIdx = (pickerVariantIdx + 1) % variants.length;
+        SFX.click();
+    }
+
+    // Tier (left/right OR a/d)
+    if (keysPressed.has('arrowleft')  || keysPressed.has('a')) {
+        pickerTier = Math.max(1, pickerTier - 1); SFX.click();
+    }
+    if (keysPressed.has('arrowright') || keysPressed.has('d')) {
+        pickerTier = Math.min(3, pickerTier + 1); SFX.click();
+    }
+
+    // Launch
+    if (keysPressed.has('enter') || keysPressed.has(' ')) {
+        SFX.open();
+        return { launch: { type: pickerCategory, variant: variants[pickerVariantIdx], tier: pickerTier } };
+    }
+
+    return 'continue';
+}
+
+export function drawTrialPicker(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = 'rgba(5,3,8,0.95)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Title
+    ctx.fillStyle = COLORS.text;
+    ctx.font = 'bold 36px Cinzel, serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('▸  TRIAL TEST CHAMBER  ◂', CANVAS_W / 2, 100);
+
+    ctx.font = 'italic 13px Cinzel, serif';
+    ctx.fillStyle = COLORS.textDim;
+    ctx.fillText('Launch any trial for practice — no rewards, no room is built', CANVAS_W / 2, 130);
+
+    // Category tabs (1-4)
+    const cats: ChallengeType[] = ['combat', 'puzzle', 'parkour', 'economy'];
+    const labels = ['1  COMBAT', '2  PUZZLE', '3  PARKOUR', '4  ECONOMY'];
+    const tabW = 170, tabY = 168;
+    const tabsStartX = (CANVAS_W - tabW * cats.length) / 2;
+    for (let i = 0; i < cats.length; i++) {
+        const tx = tabsStartX + i * tabW;
+        const active = pickerCategory === cats[i];
+        ctx.fillStyle = active ? COLORS.accent : 'rgba(90,74,114,0.4)';
+        ctx.fillRect(tx, tabY, tabW - 6, 42);
+        ctx.fillStyle = active ? COLORS.bgDark : COLORS.text;
+        ctx.font = 'bold 13px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(labels[i], tx + (tabW - 6) / 2, tabY + 21);
+    }
+
+    // Variant list
+    const variants = VARIANTS_BY_TYPE[pickerCategory];
+    const listX = CANVAS_W / 2;
+    const listY = 250;
+    const rowH = 38;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i = 0; i < variants.length; i++) {
+        const v = variants[i];
+        const y = listY + i * rowH;
+        const selected = i === pickerVariantIdx;
+        if (selected) {
+            ctx.fillStyle = 'rgba(200,155,90,0.18)';
+            ctx.fillRect(listX - 220, y - rowH / 2 + 2, 440, rowH - 4);
+            ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
+            ctx.strokeRect(listX - 220, y - rowH / 2 + 2, 440, rowH - 4);
+            ctx.fillStyle = COLORS.accent;
+        } else {
+            ctx.fillStyle = COLORS.textDim;
+        }
+        ctx.font = selected ? 'bold 20px Cinzel, serif' : '16px Cinzel, serif';
+        ctx.fillText(v.replace(/-/g, ' ').toUpperCase(), listX, y);
+    }
+
+    // Tier indicator
+    const tierY = CANVAS_H - 138;
+    ctx.fillStyle = COLORS.textDim;
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('← →  change tier', CANVAS_W / 2, tierY);
+
+    // Tier pip display
+    ctx.textBaseline = 'middle';
+    for (let t = 1; t <= 3; t++) {
+        const tx = CANVAS_W / 2 - 90 + (t - 1) * 90;
+        const active = t === pickerTier;
+        ctx.fillStyle = active ? COLORS.accent : 'rgba(90,74,114,0.4)';
+        ctx.fillRect(tx - 36, tierY + 10, 72, 38);
+        ctx.fillStyle = active ? COLORS.bgDark : COLORS.text;
+        ctx.font = 'bold 18px Cinzel, serif';
+        ctx.fillText(`TIER ${t}`, tx, tierY + 30);
+    }
+
+    // Hint
+    ctx.fillStyle = COLORS.text;
+    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('↑↓  pick variant   ·   ENTER  launch   ·   ESC / T  close', CANVAS_W / 2, CANVAS_H - 30);
+}

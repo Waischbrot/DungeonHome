@@ -119,7 +119,6 @@ export const ROOM_NAMES = [
     'Aethel', 'Vesper', 'Cinder', 'Marrow', 'Quartz', 'Loom', 'Veil',
     'Hollow', 'Ember', 'Glass', 'Iron', 'Silt', 'Hymn', 'Mote', 'Pyre',
 ];
-export const NPC_NAMES = ['Mira', 'Fenn', 'Lys', 'Veska', 'Roen', 'Cael', 'Yara', 'Pell'];
 
 // ─── Decorations (kept for type compat) ─────────────────────────
 export const DECORATIONS_BY_CATEGORY: Record<Category, DecorationKind[]> = {
@@ -139,7 +138,7 @@ export const NPC_BY_CATEGORY: Record<Category, { chance: number; role: NpcRole |
 
 export const NPC_TEMPLATES: Record<NpcRole, { title: string; color: string; lines: string[] }> = {
     architect: {
-        title: 'The First',
+        title: 'Architect',                                     // was "The First"
         color: '#d4a851',
         lines: [
             '"You woke in this hall. I am still here, between waking and sleep."',
@@ -155,7 +154,7 @@ export const NPC_TEMPLATES: Record<NpcRole, { title: string; color: string; line
         ],
     },
     smith: {
-        title: 'The Smith',
+        title: 'Smith',                                         // was "The Smith"
         color: '#c89b5a',
         lines: [
             '"Hammer, anvil, fire. Coin warms the steel as well as flame."',

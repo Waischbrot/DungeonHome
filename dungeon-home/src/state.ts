@@ -1,13 +1,37 @@
 import type {
-    Room, Door, Side, Category, ChallengeType, ClassDef,
-    JournalEntry, Npc, Renown, Decoration, RoomShape, Quest, QuestState,
+    Category,
+    ChallengeType,
+    ClassDef,
+    Decoration,
+    Door,
+    JournalEntry,
+    Npc,
+    Quest,
+    QuestState,
+    Renown,
+    Room,
+    RoomShape,
+    Side,
 } from './types';
 import {
-    ROOM_HEIGHT, ROOM_GAP, SHAPE_WIDTH, SHAPE_DOORS, SHAPE_BY_CATEGORY,
-    CHALLENGE_TO_CATEGORY, LORE_FRAGMENTS, CLASSES,
-    NPC_NAMES, NPC_TEMPLATES, NPC_BY_CATEGORY,
-    RENOWN_PER_TIER, RENOWN_XP_TO_NEXT, DOOR_TIER_REQ,
-    QUEST_CATALOG, LORE_PER_XP_TRADE, SMITH_COIN_COST, SMITH_XP_GAIN, VARIANTS_BY_TYPE,
+    CHALLENGE_TO_CATEGORY,
+    CLASSES,
+    DOOR_TIER_REQ,
+    LORE_FRAGMENTS,
+    LORE_PER_XP_TRADE,
+    NPC_BY_CATEGORY,
+    NPC_TEMPLATES,
+    QUEST_CATALOG,
+    RENOWN_PER_TIER,
+    RENOWN_XP_TO_NEXT,
+    ROOM_GAP,
+    ROOM_HEIGHT,
+    SHAPE_BY_CATEGORY,
+    SHAPE_DOORS,
+    SHAPE_WIDTH,
+    SMITH_COIN_COST,
+    SMITH_XP_GAIN,
+    VARIANTS_BY_TYPE,
 } from './constants';
 
 // The widest shape — used as a conservative "fits anywhere" predictor
@@ -37,15 +61,6 @@ export const questState: QuestState = { current: null, completed: 0, available: 
 let nextId = 1;
 const uid = (p: string) => `${p}_${nextId++}`;
 export function setClass(c: ClassDef) { player.clazz = c; }
-
-// ─── Naming ────────────────────────────────────────────────────
-const usedNpcNames = new Set<string>();
-function pickNpcName(): string {
-    const pool = NPC_NAMES.filter(n => !usedNpcNames.has(n));
-    const n = (pool.length ? pool : NPC_NAMES)[Math.floor(Math.random() * (pool.length || NPC_NAMES.length))];
-    usedNpcNames.add(n);
-    return n;
-}
 
 // ─── Shape selection ──────────────────────────────────────────
 function pickShape(category: Category): RoomShape {
@@ -239,7 +254,6 @@ function maybeSpawnNpc(room: Room) {
     room.npc = {
         id: 'npc_' + room.id,
         role: cfg.role,
-        name: cfg.role === 'architect' ? 'Aelius' : pickNpcName(),
         title: t.title,
         x: room.w / 2 + 70,
         y: room.h / 2 + 20,
@@ -462,7 +476,7 @@ export function tradeCoinsForXp() {
 
 // ─── Reset ────────────────────────────────────────────────────
 export function resetGame() {
-    rooms.clear(); usedNpcNames.clear(); journal.length = 0;
+    rooms.clear(); journal.length = 0;
     wallet.coins = 0;
     renown.level = 1; renown.xp = 0; renown.xpToNext = RENOWN_XP_TO_NEXT(1);
     stats.doorsOpened = 0; stats.rooms = 1;

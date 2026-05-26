@@ -4,7 +4,7 @@ import { keys } from '../../input';
 import { player } from '../../state';
 import { spawnBurst } from '../../particles';
 import { beep } from '../../audio';
-import { drawArena } from '../shared';
+import { drawArena, time } from '../shared';
 
 type Cell = { n: boolean; s: boolean; e: boolean; w: boolean; visited: boolean };
 type WallRect = { x: number; y: number; w: number; h: number };

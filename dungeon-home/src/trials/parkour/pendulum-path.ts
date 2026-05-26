@@ -2,7 +2,7 @@ import type { Trial } from '../../types';
 import { player } from '../../state';
 import { spawnBurst } from '../../particles';
 import { beep, SFX } from '../../audio';
-import { move, drawArena, distToSegment } from '../shared';
+import { move, drawArena, distToSegment, time } from '../shared';
 
 type Pend = {
     ax: number; ay: number; len: number;

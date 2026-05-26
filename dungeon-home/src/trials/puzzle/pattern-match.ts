@@ -2,7 +2,7 @@ import type { Trial } from '../../types';
 import { COLORS } from '../../constants';
 import { spawnBurst } from '../../particles';
 import { beep, SFX } from '../../audio';
-import { move, drawArena } from '../shared';
+import { move, drawArena, time } from '../shared';
 
 export function makePatternMatch(b: any, p: any, tier: number): Trial {
     const symbols = ['▲', '●', '■', '◆', '★', '✦'];

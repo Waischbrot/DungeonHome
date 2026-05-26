@@ -2,7 +2,7 @@ import type { Trial } from '../../types';
 import { COLORS } from '../../constants';
 import { player } from '../../state';
 import { beep, SFX } from '../../audio';
-import { move, drawArena } from '../shared';
+import { move, drawArena, time } from '../shared';
 
 export function makeMemorySeal(b: any, p: any, tier: number): Trial {
     const len = 2 + tier;

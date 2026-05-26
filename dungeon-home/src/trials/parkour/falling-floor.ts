@@ -2,7 +2,7 @@ import type { Trial } from '../../types';
 import { player } from '../../state';
 import { spawnBurst } from '../../particles';
 import { beep, SFX } from '../../audio';
-import { move, drawArena } from '../shared';
+import { move, drawArena, time } from '../shared';
 
 type Tile = { phase: 'idle' | 'warn' | 'fallen'; timer: number };
 

@@ -1,11 +1,9 @@
-import {
-    CANVAS_W, CANVAS_H, COLORS, PLAYER_SPEED,
-    SEAL_COLORS, SEAL_ICONS, CATEGORY_COLORS,
-} from './constants';
-import { rooms, player, camera, doorPos, canOpenDoor } from './state';
-import { keys } from './input';
-import { drawParticles } from './particles';
-import type { Door, Room, Decoration, Npc, NpcRole, ClassId } from './types';
+import {CANVAS_H, CANVAS_W, CATEGORY_COLORS, COLORS, PLAYER_SPEED, SEAL_COLORS, SEAL_ICONS,} from './constants';
+import {camera, canOpenDoor, doorPos, player, rooms} from './state';
+import {keys} from './input';
+import {drawParticles} from './particles';
+import type {ClassId, Decoration, Door, Npc, NpcRole, Room} from './types';
+import {time} from './trials/shared';
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -35,15 +33,19 @@ export function updateHub() {
     if (keys.has('a') || keys.has('arrowleft'))  dx -= 1;
     if (keys.has('d') || keys.has('arrowright')) dx += 1;
     if (dx && dy) { dx *= 0.707; dy *= 0.707; }
-    const sp = player.clazz.id === 'wayfarer' ? PLAYER_SPEED * 1.15 : PLAYER_SPEED;
+    const speedBase = player.clazz.id === 'wayfarer' ? PLAYER_SPEED * 1.15 : PLAYER_SPEED;
+    const sp = speedBase * time.dt;                              // ← dt-scaled
     const nx = player.x + dx * sp, ny = player.y + dy * sp;
     if (canStand(nx, ny)) { player.x = nx; player.y = ny; }
     else if (canStand(nx, player.y)) player.x = nx;
     else if (canStand(player.x, ny)) player.y = ny;
 
-    camera.x += (player.x - camera.x) * 0.12;
-    camera.y += (player.y - camera.y) * 0.12;
-    if (camera.shake > 0) camera.shake *= 0.85;
+    // Camera smoothing — dt-aware exponential follow.
+    // 0.12 is the per-60fps-frame catch-up factor; we scale it by dt.
+    const camLerp = 1 - Math.pow(1 - 0.12, time.dt);
+    camera.x += (player.x - camera.x) * camLerp;
+    camera.y += (player.y - camera.y) * camLerp;
+    if (camera.shake > 0) camera.shake *= Math.pow(0.85, time.dt);
 
     for (const r of rooms.values()) if (isInRoom(player.x, player.y, r)) { player.room = r.id; break; }
 }
@@ -745,7 +747,7 @@ function drawNpc(ctx: CanvasRenderingContext2D, r: Room, npc: Npc) {
         const py = wy - 36 + Math.sin(Date.now() / 300) * 2;
         ctx.font = 'bold 11px Cinzel, serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        const text = `${npc.name}  ·  ${npc.title}`;
+        const text = npc.title
         const textW = ctx.measureText(text).width;
         ctx.fillStyle = 'rgba(28, 22, 18, 0.94)';
         ctx.fillRect(wx - textW / 2 - 10, py - 9, textW + 20, 18);

@@ -2,42 +2,72 @@ import type { Trial } from '../../types';
 import { COLORS } from '../../constants';
 import { spawnBurst } from '../../particles';
 import { beep } from '../../audio';
-import { move, drawArena } from '../shared';
+import { move, drawArena, time } from '../shared';
 
 type Mirror = { col: number; row: number; orient: '/' | '\\' };
+type Wall   = { col: number; row: number };
 
 type Layout = {
     cols: number;
     rows: number;
-    sourceCol: number; sourceRow: number;     // source is outside the grid (col = -1 or col = cols, etc.)
-    targetCol: number; targetRow: number;     // same — target sits one cell outside
+    sourceCol: number; sourceRow: number;
+    targetCol: number; targetRow: number;
     mirrors: { col: number; row: number }[];
+    walls: Wall[];
 };
 
-// Hand-designed layouts — each one HAS a solution if mirrors are rotated correctly.
+// All three layouts hand-verified solvable.
+// If you change them, the brute-force check at startup will warn in the console.
 const LAYOUTS: Layout[] = [
-    // ── tier 1: simple Z (2 mirrors, both must be \) ──
+    // ── Tier 1: 4 mirrors + 1 wall ──
+    // Same row source→target, wall blocks the direct path. Detour via row 3.
+    // Solving config: \, \, /, /
     {
-        cols: 8, rows: 5,
+        cols: 9, rows: 5,
         sourceCol: -1, sourceRow: 1,
-        targetCol:  8, targetRow: 3,
-        mirrors: [{ col: 3, row: 1 }, { col: 3, row: 3 }],
+        targetCol:  9, targetRow: 1,
+        mirrors: [
+            { col: 2, row: 1 }, { col: 2, row: 3 },
+            { col: 6, row: 3 }, { col: 6, row: 1 },
+        ],
+        walls: [{ col: 4, row: 1 }],
     },
-    // ── tier 2: hook to the top edge (3 mirrors) ──
+
+    // ── Tier 2: 5 mirrors + 2 walls ──
+    // Diagonal corner-to-corner with a stagger that forces an up-bend.
+    // Solving config: \, \, /, /, \
     {
-        cols: 7, rows: 5,
-        sourceCol: -1, sourceRow: 2,
-        targetCol:  4, targetRow: -1,            // exits on the TOP
-        mirrors: [{ col: 1, row: 2 }, { col: 1, row: 4 }, { col: 4, row: 4 }],
-    },
-    // ── tier 3: rectangular S (4 mirrors) ──
-    {
-        cols: 8, rows: 4,
+        cols: 11, rows: 5,
         sourceCol: -1, sourceRow: 0,
-        targetCol:  8, targetRow: 0,
+        targetCol: 10, targetRow: 4,
+        mirrors: [
+            { col: 1, row: 0 }, { col: 1, row: 4 },
+            { col: 5, row: 4 }, { col: 5, row: 2 },
+            { col: 10, row: 2 },
+        ],
+        walls: [
+            { col: 3, row: 0 },     // blocks direct row-0 dash
+            { col: 3, row: 2 },     // blocks a tempting middle shortcut
+        ],
+    },
+
+    // ── Tier 3: 6 mirrors + 3 walls ──
+    // Source + target both on the top row, but a wall forces you all the way
+    // down to row 4, across the bottom, then back up the right side.
+    // Solving config: \, \, \, \, /, /
+    {
+        cols: 11, rows: 5,
+        sourceCol: -1, sourceRow: 0,
+        targetCol: 11, targetRow: 0,
         mirrors: [
             { col: 1, row: 0 }, { col: 1, row: 3 },
-            { col: 4, row: 3 }, { col: 4, row: 0 },
+            { col: 4, row: 3 }, { col: 4, row: 4 },
+            { col: 10, row: 4 }, { col: 10, row: 0 },
+        ],
+        walls: [
+            { col: 3, row: 0 },     // blocks the easy left-side dash
+            { col: 5, row: 2 },     // blocks the middle
+            { col: 9, row: 0 },     // blocks the easy right-side dash
         ],
     },
 ];
@@ -46,17 +76,16 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
     const layout = LAYOUTS[Math.min(tier - 1, LAYOUTS.length - 1)];
     const { cols, rows, sourceCol, sourceRow, targetCol, targetRow } = layout;
 
-    // Mirrors with random initial orientation
     const mirrors: Mirror[] = layout.mirrors.map(m => ({
         ...m, orient: Math.random() < 0.5 ? '/' : '\\',
     }));
+    const walls: Wall[] = [...layout.walls];
 
-    // Trace the beam through cells, bouncing off any mirror it meets.
-    // Returns the polyline (in cell coords) plus whether the target was reached.
+    // Trace the beam through cells. Walls absorb, mirrors reflect.
     function computeBeam() {
         const path: { col: number; row: number }[] = [{ col: sourceCol, row: sourceRow }];
         let col = sourceCol, row = sourceRow;
-        let dx = 1, dy = 0;   // source always fires to the right
+        let dx = 1, dy = 0;
         const maxSteps = (cols + 2) * (rows + 2) * 4;
         let steps = 0, hits = false;
         while (steps++ < maxSteps) {
@@ -64,13 +93,36 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
             path.push({ col, row });
             if (col === targetCol && row === targetRow) { hits = true; break; }
             if (col < -1 || col > cols || row < -1 || row > rows) break;
+            // Wall → beam absorbed
+            if (walls.some(w => w.col === col && w.row === row)) break;
+            // Mirror → reflect
             const m = mirrors.find(mm => mm.col === col && mm.row === row);
             if (m) {
-                if (m.orient === '/') { [dx, dy] = [-dy, -dx]; }   // r↔u, l↔d
-                else                  { [dx, dy] = [ dy,  dx]; }   // r↔d, l↔u
+                if (m.orient === '/') { [dx, dy] = [-dy, -dx]; }
+                else                  { [dx, dy] = [ dy,  dx]; }
             }
         }
         return { path, hits };
+    }
+
+    // ── Solvability guard ──
+    // Brute-force all 2^N orientations. If none reach the target, the layout
+    // itself is broken — log to console so we catch it before shipping a bad puzzle.
+    function hasAnyValidSolution(): boolean {
+        const total = 1 << mirrors.length;          // 2^N combos
+        const original = mirrors.map(m => m.orient);
+        let found = false;
+        for (let bits = 0; bits < total; bits++) {
+            for (let i = 0; i < mirrors.length; i++) {
+                mirrors[i].orient = (bits & (1 << i)) ? '/' : '\\';
+            }
+            if (computeBeam().hits) { found = true; break; }
+        }
+        mirrors.forEach((m, i) => m.orient = original[i]);
+        return found;
+    }
+    if (!hasAnyValidSolution()) {
+        console.warn(`MirrorBeam tier ${tier}: layout has NO solving orientation!`);
     }
 
     // Re-randomize until the puzzle isn't already solved
@@ -79,10 +131,10 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
         for (const m of mirrors) m.orient = Math.random() < 0.5 ? '/' : '\\';
     }
 
-    // Sizing — fit the grid + a 1-cell halo (for the source/target) inside the arena
+    // Sizing — fit grid + halo for source/target
     const CELL = Math.min(
-        80,
-        Math.floor(Math.min(b.w * 0.85 / (cols + 2), b.h * 0.7 / (rows + 2))),
+        72,
+        Math.floor(Math.min(b.w * 0.85 / (cols + 2), b.h * 0.70 / (rows + 2))),
     );
     const gridPx = { w: cols * CELL, h: rows * CELL };
     const ox = b.x + (b.w - gridPx.w) / 2;
@@ -91,7 +143,6 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
     const wx = (c: number) => ox + c * CELL + CELL / 2;
     const wy = (r: number) => oy + r * CELL + CELL / 2;
 
-    // Spawn the player near the centre of the grid
     p.x = ox + gridPx.w / 2;
     p.y = oy + gridPx.h / 2;
 
@@ -102,14 +153,14 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
     return {
         type: 'puzzle', variant: 'mirror-beam', player: p, bounds: b,
         title: `◉  MIRROR BEAM · TIER ${tier}`,
-        hint: 'Step on a mirror to rotate it — guide the beam to the target',
+        hint: 'Step on a mirror to rotate it — guide the beam past the walls to the target',
 
         update() {
             pulseT++;
             if (won) return;
             move(p, b);
 
-            // Which grid cell is the player on?
+            // Toggle mirrors by stepping (walls aren't toggleable)
             const cc = Math.floor((p.x - ox) / CELL);
             const cr = Math.floor((p.y - oy) / CELL);
             if (cc >= 0 && cc < cols && cr >= 0 && cr < rows) {
@@ -149,9 +200,24 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
             }
             for (let r = 0; r <= rows; r++) {
                 ctx.beginPath();
-                ctx.moveTo(ox,             oy + r * CELL);
-                ctx.lineTo(ox + gridPx.w,  oy + r * CELL);
+                ctx.moveTo(ox,            oy + r * CELL);
+                ctx.lineTo(ox + gridPx.w, oy + r * CELL);
                 ctx.stroke();
+            }
+
+            // ── Walls (drawn under mirrors/beam) ──
+            for (const w of walls) {
+                const cx = wx(w.col), cy = wy(w.row);
+                ctx.fillStyle = '#2a1f18';
+                ctx.fillRect(cx - CELL / 2 + 4, cy - CELL / 2 + 4, CELL - 8, CELL - 8);
+                ctx.strokeStyle = '#1a1010'; ctx.lineWidth = 2;
+                ctx.strokeRect(cx - CELL / 2 + 4, cy - CELL / 2 + 4, CELL - 8, CELL - 8);
+                // brick texture
+                ctx.fillStyle = '#1a1010';
+                for (let i = 0; i < 3; i++) {
+                    const off = (i % 2) * 8;
+                    ctx.fillRect(cx - CELL / 2 + 8 + off, cy - CELL / 2 + 10 + i * 12, CELL - 24 - off, 4);
+                }
             }
 
             // Beam
@@ -170,7 +236,7 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
             ctx.shadowBlur = 0;
             ctx.lineCap = 'butt';
 
-            // Source orb (gold sun)
+            // Source orb
             const sx = wx(sourceCol), sy = wy(sourceRow);
             ctx.fillStyle = '#c89b5a';
             ctx.shadowColor = '#c89b5a'; ctx.shadowBlur = 14;
@@ -197,12 +263,10 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
             // Mirrors
             for (const m of mirrors) {
                 const cx = wx(m.col), cy = wy(m.row);
-                // tile base
                 ctx.fillStyle = 'rgba(40, 30, 50, 0.75)';
                 ctx.fillRect(cx - CELL / 2 + 6, cy - CELL / 2 + 6, CELL - 12, CELL - 12);
                 ctx.strokeStyle = '#6a5a8a'; ctx.lineWidth = 1;
                 ctx.strokeRect(cx - CELL / 2 + 6, cy - CELL / 2 + 6, CELL - 12, CELL - 12);
-                // mirror line
                 ctx.strokeStyle = '#dde0ea'; ctx.lineWidth = 5;
                 ctx.shadowColor = '#dde0ea'; ctx.shadowBlur = 4;
                 ctx.lineCap = 'round';
@@ -217,9 +281,6 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
                 ctx.stroke();
                 ctx.shadowBlur = 0;
                 ctx.lineCap = 'butt';
-                // subtle dust under the mirror so it has weight
-                ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                ctx.fillRect(cx - CELL / 2 + 6, cy + CELL / 2 - 4, CELL - 12, 2);
             }
 
             // Header
@@ -227,7 +288,7 @@ export function makeMirrorBeam(b: any, p: any, tier: number): Trial {
             ctx.font = 'bold 14px "JetBrains Mono", monospace';
             ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
             ctx.fillText(
-                won ? 'BEAM LOCKED ✦' : 'STEP ON A MIRROR TO ROTATE',
+                won ? 'BEAM LOCKED ✦' : 'STEP ON MIRRORS TO ROTATE · DARK BLOCKS ABSORB THE BEAM',
                 b.x + b.w / 2, b.y + 36,
             );
         },

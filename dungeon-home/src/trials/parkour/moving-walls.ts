@@ -2,7 +2,7 @@ import type { Trial } from '../../types';
 import { player } from '../../state';
 import { spawnBurst } from '../../particles';
 import { beep, SFX } from '../../audio';
-import { move, drawArena } from '../shared';
+import { move, drawArena, time } from '../shared';
 
 export function makeMovingWalls(b: any, p: any, tier: number): Trial {
     p.x = b.x + 30; p.y = b.y + b.h / 2;

@@ -1,7 +1,7 @@
 import type { Trial } from '../../types';
 import { COLORS } from '../../constants';
 import { beep, SFX } from '../../audio';
-import { move, drawArena } from '../shared';
+import { move, drawArena, time } from '../shared';
 
 export function makeRuneCipher(b: any, p: any, tier: number): Trial {
     const runes  = ['Ϛ', 'Ψ', 'Ω', 'Ϟ', 'Ϡ'];

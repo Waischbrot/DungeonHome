@@ -2,7 +2,7 @@ import type { Trial } from '../../types';
 import { COLORS } from '../../constants';
 import { spawnBurst } from '../../particles';
 import { beep } from '../../audio';
-import { move, drawArena } from '../shared';
+import { move, drawArena, time } from '../shared';
 
 export function makeLightsOut(b: any, p: any, tier: number): Trial {
     // ── Board sizing (was 6×4 on tier 3 due to an off-by-one in cols) ──
